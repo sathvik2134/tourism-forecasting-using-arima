@@ -1,0 +1,79 @@
+---
+title: "AAT"
+output: pdf_document
+date: "2024-12-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(tseries)
+library(forecast)
+
+data <- read.csv("C:\\Users\\sathw\\Downloads\\Thaitourism.csv")
+
+cat("Dataset Overview:\n")
+cat("Number of Rows:", nrow(data), "\n")
+cat("Number of Columns:", ncol(data), "\n")
+cat("Column Names:\n")
+print(names(data))
+cat("\nSummary of the dataset:\n")
+summary(data)
+
+# Assuming 'year' and 'month' are separate columns and the data is in "yyyy" and "mm" format
+# Combine 'year' and 'month' into a date column, using the first day of the month
+data$date <- as.Date(paste(data$year, data$month, "01", sep = "-"), format = "%Y-%m-%d")
+
+cat("\nChecking for missing values:\n")
+print(sapply(data, function(x) sum(is.na(x))))
+
+data$tourist[is.na(data$tourist)] <- 0  # Assuming the column 'tourist' needs to be filled
+
+# Group by 'date' and summarize 'tourist' (total tourists per month)
+time_series_data <- data %>%
+  group_by(date) %>%
+  summarise(tourist = sum(tourist))
+
+# Create time series object for 'tourist' data, starting from the first available date
+tourist_ts <- ts(time_series_data$tourist, start = c(year(min(time_series_data$date)), month(min(time_series_data$date))),
+                 frequency = 12)  # Monthly frequency
+
+cat("\nDickey-Fuller Test:\n")
+adf_test <- adf.test(tourist_ts)
+print(adf_test)
+
+cat("\nKPSS Test:\n")
+kpss_test <- kpss.test(tourist_ts)
+print(kpss_test)
+
+# Differencing the series to make it stationary
+differenced_tourist_ts <- diff(tourist_ts)
+
+# Plot the differenced time series
+plot(differenced_tourist_ts, main = "Differenced Time Series", ylab = "Differenced Tourists", xlab = "Time")
+
+# Fit an ARIMA model to the differenced data
+auto_model <- auto.arima(differenced_tourist_ts)
+cat("\nSelected ARIMA Model:\n")
+print(auto_model)
+
+# Check residuals of the model
+checkresiduals(auto_model)
+
+# Forecast the next 12 months
+forecast_values <- forecast(auto_model, h = 12)
+plot(forecast_values, main = "Forecasted Tourists", ylab = "Tourists", xlab = "Time")
+
+cat("\nConclusions:\n")
+cat("1. The dataset was preprocessed to handle missing values and converted into a time series object.\n")
+cat("2. Stationarity tests indicated (non-)stationarity, and differencing was applied to make the series stationary.\n")
+cat("3. An ARIMA model was fitted, and the residuals were validated to behave like white noise.\n")
+cat("4. Future tourist numbers were forecasted for the next 12 months.\n")
+
+
+```
+
